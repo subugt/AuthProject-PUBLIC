@@ -9,4 +9,5 @@
 - [x] Forward INVALID REQUESTS TO GOOGLE
 - [x] ENCRYPTION AND SAVE WITH JSON
 - [x] EXTRA SECURITY ( WEB TOKENS )
+- [ ] MACOS, LINUX Support ( not tested but it should support at all we are not sure so unchecked )
 - [ ] future updates.
