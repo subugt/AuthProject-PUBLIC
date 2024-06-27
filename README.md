@@ -1,3 +1,8 @@
+# requirements 
+Openssl
+nlohman json
+enet 
+
 # BUILD TUTORIAL 
 right now just src without build files ( too lazy to create one )
 
