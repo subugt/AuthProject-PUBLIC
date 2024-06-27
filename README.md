@@ -1,7 +1,8 @@
 # requirements 
-Openssl
-nlohman json
-enet 
+- 1- Openssl
+- 2- nlohman json
+- 3- enet
+- Writen with cpp20
 
 # BUILD TUTORIAL 
 right now just src without build files ( too lazy to create one )
