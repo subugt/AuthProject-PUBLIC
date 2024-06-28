@@ -1,4 +1,4 @@
-# requirements 
+# requirements - credits
 - 1- Openssl
 - 2- nlohman json
 - 3- enet
