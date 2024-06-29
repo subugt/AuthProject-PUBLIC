@@ -1,3 +1,5 @@
+# please leave credits as  link "current repo" and username "subugt" 
+
 # requirements - credits
 - 1- Openssl
 - 2- nlohman json
