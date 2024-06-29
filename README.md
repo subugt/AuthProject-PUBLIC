@@ -19,3 +19,6 @@ right now just src without build files ( too lazy to create one )
 - [x] EXTRA SECURITY ( WEB TOKENS )
 - [ ] MACOS, LINUX Support ( not tested but it should support at all we are not sure so unchecked )
 - [ ] future updates.
+
+# LICENSE
+This project licensed with MIT LICENSE please check it out before doing anything with that software/source.
