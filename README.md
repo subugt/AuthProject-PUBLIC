@@ -21,4 +21,4 @@ right now just src without build files ( too lazy to create one )
 - [ ] future updates.
 
 # LICENSE
-This project licensed with MIT LICENSE please check it out before doing anything with that software/source.
+This project licensed with [https://github.com/subugt/AuthProject-PUBLIC#] MIT LICENSE please check it out before doing anything with that software/source.
