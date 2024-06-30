@@ -114,9 +114,4 @@ This project is licensed under the MIT License. See the [https://github.com/subu
 - [ ] to cease updating the project indefinitely.
 
 ---
-
-1. **License and build status**:
-   ```markdown
-   ![.](https://github.com/subugt/AuthProject-PUBLIC/workflows/CI/badge.svg)
-   ![https://github.com/subugt/AuthProject-PUBLIC/license.txt](https://img.shields.io/github/license/subugt/AuthProject-PUBLIC)
-   ```
+LEAVE A STAR FOR SUPPORTING ME 😂
