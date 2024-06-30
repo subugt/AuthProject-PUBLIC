@@ -2,18 +2,20 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <chrono>
 #include "encryption.hpp"
 #include "user_manager.hpp"
+#include "ddos_protection.hpp"
 #include <nlohmann/json.hpp>
 
 UserManager userManager;
+DDoSProtection ddosProtection(100, 60, 300, 1024); // 100 requests 60 seconds window 300 seconds block 1024 byte max packet size
 
 void handleCommand(const std::string& command) {
     nlohmann::json json_cmd;
     try {
         json_cmd = nlohmann::json::parse(command);
-    }
-    catch (const nlohmann::json::parse_error& e) {
+    } catch (const nlohmann::json::parse_error& e) {
         std::cout << "Invalid JSON format" << std::endl;
         return;
     }
@@ -32,46 +34,38 @@ void handleCommand(const std::string& command) {
         bool status = json_cmd.value("status", false);
         userManager.setMaintenance(status);
         std::cout << "Maintenance mode " << (status ? "enabled" : "disabled") << std::endl;
-    }
-    else if (cmd_type == "block_requests") {
+    } else if (cmd_type == "block_requests") {
         bool status = json_cmd.value("status", false);
         userManager.blockAllRequests(status);
         std::cout << "All requests " << (status ? "blocked" : "unblocked") << std::endl;
-    }
-    else if (cmd_type == "add_user") {
+    } else if (cmd_type == "add_user") {
         std::string username = json_cmd.value("username", "");
         int version = json_cmd.value("version", 1);
         auto expire_time = std::chrono::system_clock::now() + std::chrono::hours(json_cmd.value("expire_hours", 24 * 30));
         userManager.addUser(username, version, expire_time);
         std::cout << "Added user: " << username << std::endl;
-    }
-    else if (cmd_type == "remove_user") {
+    } else if (cmd_type == "remove_user") {
         std::string username = json_cmd.value("username", "");
         userManager.removeUser(username);
         std::cout << "Removed user: " << username << std::endl;
-    }
-    else if (cmd_type == "search_user") {
+    } else if (cmd_type == "search_user") {
         std::string username = json_cmd.value("username", "");
         userManager.searchByUsername(username);
-    }
-    else if (cmd_type == "ban_user") {
+    } else if (cmd_type == "ban_user") {
         std::string username = json_cmd.value("username", "");
         userManager.banByUsername(username);
         std::cout << "Banned user: " << username << std::endl;
-    }
-    else if (cmd_type == "extend_version") {
+    } else if (cmd_type == "extend_version") {
         int new_version = json_cmd.value("new_version", 1);
         bool block_old_users = json_cmd.value("block_old_users", false);
         userManager.extendVersion(new_version, block_old_users);
         std::cout << "Extended version to: " << new_version << std::endl;
-    }
-    else if (cmd_type == "extend_user_expire") {
+    } else if (cmd_type == "extend_user_expire") {
         std::string username = json_cmd.value("username", "");
         auto duration = std::chrono::hours(json_cmd.value("hours", 24 * 30));
         userManager.extendUserExpireTimeByUsername(username, duration);
         std::cout << "Extended expire time for user: " << username << std::endl;
-    }
-    else if (cmd_type == "extend_all_users_expire") {
+    } else if (cmd_type == "extend_all_users_expire") {
         auto duration = std::chrono::hours(json_cmd.value("hours", 24 * 30));
         userManager.extendAllUsersExpireTime(duration);
         std::cout << "Extended expire time for all users" << std::endl;
@@ -98,15 +92,15 @@ int main(int argc, char** argv) {
 
     std::cout << "Server started..." << std::endl;
 
-   // Aes256 key
+    // Aes256 key
     std::string key = "coolpasswordforaes256keynicee!"; 
 
-    // NEXT UPDATE WILL ABLE TO ADD USERS WHILE RUNTIME DONT WORRY
+    // Adding some users
     auto now = std::chrono::system_clock::now();
-    userManager.addUser("user1", 1, now + std::chrono::hours(24 * 30));  // 24 hour X days so that means 24.1 = 1 day 24.2 = 2 day
+    userManager.addUser("user1", 1, now + std::chrono::hours(24 * 30));  
     userManager.addUser("user2", 1, now + std::chrono::hours(24 * 60));  
 
-    //main server 
+    // Main server loop
     ENetEvent event;
     while (true) {
         while (enet_host_service(server, &event, 1000) > 0) {
@@ -116,60 +110,56 @@ int main(int argc, char** argv) {
                 continue;
             }
 
+            enet_uint32 clientIP = event.peer->address.host;
             switch (event.type) {
-            case ENET_EVENT_TYPE_CONNECT:
-                if (userManager.areRequestsBlocked()) {
-                    std::cout << "All requests are blocked, rejecting connection." << std::endl;
-                    enet_peer_reset(event.peer);
-                }
-                else {
-                    std::cout << "A new client connected from "
-                        << event.peer->address.host << ":"
-                        << event.peer->address.port << std::endl;
-                    event.peer->data = (void*)"Client information";
-                }
-                break;
+                case ENET_EVENT_TYPE_CONNECT:
+                    if (ddosProtection.isBlocked(clientIP) || userManager.areRequestsBlocked()) {
+                        std::cout << "Connection from " << clientIP << " blocked." << std::endl;
+                        enet_peer_reset(event.peer);
+                    } else {
+                        std::cout << "A new client connected from " << clientIP << std::endl;
+                        ddosProtection.registerRequest(clientIP);
+                    }
+                    break;
 
-            case ENET_EVENT_TYPE_RECEIVE: {
-                if (userManager.areRequestsBlocked()) {
-                    std::cout << "All requests are blocked, discarding received packet." << std::endl;
+                case ENET_EVENT_TYPE_RECEIVE:
+                    if (ddosProtection.isBlocked(clientIP) || !ddosProtection.isPacketSizeValid(event.packet->dataLength)) {
+                        std::cout << "Packet from " << clientIP << " blocked due to DDoS protection." << std::endl;
+                        enet_packet_destroy(event.packet);
+                    } else {
+                        std::cout << "A packet received from "
+                            << clientIP << " containing "
+                            << event.packet->dataLength << " bytes." << std::endl;
+
+                        std::vector<uint8_t> received_data(event.packet->data, event.packet->data + event.packet->dataLength);
+                        std::string decrypted_message = Encryption::decrypt(received_data, key);
+
+                        std::cout << "Decrypted message: " << decrypted_message << std::endl;
+
+                        if (decrypted_message.rfind("command:", 0) == 0) {
+                            std::string command = decrypted_message.substr(8);
+                            handleCommand(command);
+                        } else {
+                            std::cout << "Invalid request format or unauthorized access, redirecting to Google." << std::endl;
+                            const char* redirect_msg = "HTTP/1.1 302 Found\r\nLocation: https://www.google.com/\r\n\r\n";
+                            ENetPacket* packet = enet_packet_create(redirect_msg, strlen(redirect_msg) + 1, ENET_PACKET_FLAG_RELIABLE);
+                            enet_peer_send(event.peer, 0, packet);
+                        }
+                    }
+
                     enet_packet_destroy(event.packet);
                     break;
-                }
 
-                std::cout << "A packet received from "
-                    << (char*)event.peer->data << " containing "
-                    << event.packet->dataLength << " bytes." << std::endl;
+                case ENET_EVENT_TYPE_DISCONNECT:
+                    std::cout << "Client " << clientIP << " disconnected." << std::endl;
+                    break;
 
-                std::vector<uint8_t> received_data(event.packet->data, event.packet->data + event.packet->dataLength);
-                std::string decrypted_message = Encryption::decrypt(received_data, key);
-
-                std::cout << "Decrypted message: " << decrypted_message << std::endl;
-
-                if (decrypted_message.rfind("command:", 0) == 0) {
-                    std::string command = decrypted_message.substr(8);
-                    handleCommand(command);
-                }
-                else {
-                    // WHY WE SHOULD HANDLE ALL INVALID REQUESTS? MAYBE GOOGLE WILL :D
-                    std::cout << "Invalid request format or unauthorized access, redirecting to Google." << std::endl;
-                    const char* redirect_msg = "HTTP/1.1 302 Found\r\nLocation: https://www.google.com/\r\n\r\n";
-                    ENetPacket* packet = enet_packet_create(redirect_msg, strlen(redirect_msg) + 1, ENET_PACKET_FLAG_RELIABLE);
-                    enet_peer_send(event.peer, 0, packet);
-                }
-
-                enet_packet_destroy(event.packet);
-                break;
-            }
-
-            case ENET_EVENT_TYPE_DISCONNECT:
-                std::cout << (char*)event.peer->data << " disconnected." << std::endl;
-                event.peer->data = nullptr;
-                break;
+                default:
+                    break;
             }
         }
     }
 
     enet_host_destroy(server);
     return EXIT_SUCCESS;
-}
+} // I WILL CONTINUE DONT WORRY 
