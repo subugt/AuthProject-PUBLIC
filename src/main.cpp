@@ -3,13 +3,90 @@
 #include <vector>
 #include <string>
 #include <chrono>
+#include <fstream>
+#include <ctime>
 #include "encryption.hpp"
 #include "user_manager.hpp"
 #include "ddos_protection.hpp"
 #include <nlohmann/json.hpp>
-
+#include <openssl/aes.h>
 UserManager userManager;
 DDoSProtection ddosProtection(100, 60, 300, 1024); // 100 requests 60 seconds window 300 seconds block 1024 byte max packet size
+
+const std::string AesKey = "passwordforaes256!";
+const std::string aesiv = "saymyname12c";
+
+
+std::string encryptAES(const std::string& plainText) {
+    AES_KEY aesKeyEncrypt;
+    AES_set_encrypt_key(reinterpret_cast<const unsigned char*>(aesKey.c_str()), 256, &aesKeyEncrypt);
+
+    std::string encryptedText;
+    int padding = 0;
+    int plainTextLength = plainText.length();
+
+    if (plainTextLength % AES_BLOCK_SIZE != 0) {
+        padding = AES_BLOCK_SIZE - (plainTextLength % AES_BLOCK_SIZE);
+    }
+
+    int encryptedLength = plainTextLength + padding;
+    unsigned char iv[AES_BLOCK_SIZE];
+    memset(iv, 0, AES_BLOCK_SIZE);
+
+    AES_cbc_encrypt(reinterpret_cast<const unsigned char*>(plainText.c_str()), 
+                    reinterpret_cast<unsigned char*>(encryptedText.data()), 
+                    encryptedLength, &aesKeyEncrypt, iv, AES_ENCRYPT);
+
+    return encryptedText;
+}
+
+
+std::string decryptAES(const std::string& encryptedText) {
+    AES_KEY aesKeyDecrypt;
+    AES_set_decrypt_key(reinterpret_cast<const unsigned char*>(aesKey.c_str()), 256, &aesKeyDecrypt);
+
+    std::string decryptedText;
+    unsigned char iv[AES_BLOCK_SIZE];
+    memset(iv, 0, AES_BLOCK_SIZE);
+
+    AES_cbc_encrypt(reinterpret_cast<const unsigned char*>(encryptedText.c_str()), 
+                    reinterpret_cast<unsigned char*>(decryptedText.data()), 
+                    encryptedText.length(), &aesKeyDecrypt, iv, AES_DECRYPT);
+
+    return decryptedText;
+}
+
+std::string getCurrentTimeAsString() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    return std::ctime(&now_c);
+}
+
+
+void writeToBlockedRequestsLog(const std::string& ip, int packetSize, std::chrono::seconds blockTime, std::chrono::seconds attackTime) {
+    std::ofstream logFile("blocked_requests.log", std::ios::app);
+    if (logFile.is_open()) {
+        logFile << "IP: " << ip << " - Packet Size: " << packetSize
+                << " - Block Time: " << blockTime.count() << " seconds"
+                << " - Attack Time: " << attackTime.count() << " seconds"
+                << " - Time: " << getCurrentTimeAsString();
+        logFile.close();
+    } else {
+        std::cerr << "Unable to open blocked requests log file for writing." << std::endl;
+    }
+}
+
+
+void writeToEncryptedLog(const std::string& encryptedMessage) {
+    std::ofstream logFile("server_log.dat", std::ios::app | std::ios::binary);
+    if (logFile.is_open()) {
+        logFile << encryptedMessage << std::endl;
+        logFile.close();
+    } else {
+        std::cerr << "Unable to open encrypted log file for writing." << std::endl;
+    }
+}
+
 
 void handleCommand(const std::string& command) {
     nlohmann::json json_cmd;
@@ -115,6 +192,8 @@ int main(int argc, char** argv) {
                 case ENET_EVENT_TYPE_CONNECT:
                     if (ddosProtection.isBlocked(clientIP) || userManager.areRequestsBlocked()) {
                         std::cout << "Connection from " << clientIP << " blocked." << std::endl;
+ std::string logMessage = "IP blocked due to DDoS or invalid packet size: " + std::to_string(clientIP);
+                        writeToEncryptedLog(encryptAES(logMessage));
                         enet_peer_reset(event.peer);
                     } else {
                         std::cout << "A new client connected from " << clientIP << std::endl;
