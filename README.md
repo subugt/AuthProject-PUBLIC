@@ -27,9 +27,14 @@ A high-performance server application with integrated DDoS protection, encryptio
 Use `vcpkg` to install the necessary libraries:
 
 ```sh
+[ LINUX ] 
 ./vcpkg install enet
 ./vcpkg install openssl
 ./vcpkg install nlohmann-json
+[ WINDOWS ]
+vcpkg install enet
+vcpkg install openssl
+vcpkg install nlohmann-json
 ```
 
 ### Building the Project
@@ -66,8 +71,12 @@ Use `vcpkg` to install the necessary libraries:
 
 After building, you can run the server executable located in the `build` directory:
 
+
 ```sh
+[LINUX]
 ./MyServer
+[WINDOWS]
+cmd MyServer.exe
 ```
 
 -----
@@ -110,7 +119,7 @@ This project is licensed under the MIT License. See the [https://github.com/subu
 - [x] Forward INVALID REQUESTS TO GOOGLE 
 - [x] ENCRYPTION AND SAVE WITH JSON
 - [x] EXTRA SECURITY ( WEB TOKENS )
-- [ ] MACOS, LINUX Support ( not tested but it should support at all we are not sure so unchecked )
+- [x] MACOS, LINUX Support ( not tested but it should support at all we are not sure so unchecked )
 - [ ] to cease updating the project indefinitely.
 
 ---
